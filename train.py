@@ -89,6 +89,7 @@ def main():
     while True:
         t0 = time.time()
         batch = read_batch()
+        model.cleargrads()
         pred_ys, train_hs, train_cs = model(batch, train_hs, train_cs)
         pred_ys = F.stack(pred_ys, axis=0)
         loss = F.softmax_cross_entropy(
@@ -96,13 +97,13 @@ def main():
                     pred_ys[:,:-1],
                     (pred_ys.shape[0]*(pred_ys.shape[1]-1), pred_ys.shape[2])),
                 F.flatten(batch[:,1:]))
-        model.cleargrads()
         loss.backward()
+        loss.unchain_backward()
         optimizer.update()
         print('TRAIN', cuda.to_cpu(loss.data), time.time()-t0, flush=True)
 
 
 if __name__ == '__main__':
-    with chainer.using_config('use_cudnn', 'never'):
+    with chainer.using_config('use_cudnn', 'auto'):
         main()
 
