@@ -31,7 +31,7 @@ class DecoderState:
 class Hypothesis:
     def __init__(self, state, x_t,
                  log_p=0.0, distance=0.0, n_copied=0,
-                 source_pos=0, edits=()):
+                 source_pos=0, edit_cost=6.0, edits=()):
         self.state = state
         self.x_t = x_t
         self.log_p = log_p
@@ -39,7 +39,7 @@ class Hypothesis:
         self.n_copied = n_copied
         self.source_pos = source_pos
         self.edits = edits
-        self.score = log_p - 4*distance
+        self.score =log_p - edit_cost*distance
 
 
 class EditOp:
@@ -72,7 +72,8 @@ class SkipReplace(EditOp):
                 self.position, self.left, self.original, self.symbol,
                 self.right)
 
-def correct(model, text, beam_size=10, drop_unknown=True):
+def correct(model, text, beam_size=10, drop_unknown=True, entropy_weight=0.0,
+            edit_cost=6.0):
     xp = model.xp
     unk = model.alphabet_index['<UNK>']
     bos = model.alphabet_index[' ']
@@ -102,11 +103,12 @@ def correct(model, text, beam_size=10, drop_unknown=True):
             else:
                 state = hyp.state(
                         xp.array([[hyp.x_t]], dtype=xp.int32), hyp.x_t)
-                state.log_pred = np.log2(
-                        cuda.to_cpu(F.softmax(state.pred[0]).data)[0])
+                state.p = cuda.to_cpu(F.softmax(state.pred[0]).data)[0]
+                state.log_p = np.log2(state.p)
+                state.entropy = -(state.p * state.log_p).sum()
                 new_states[new_state_id] = state
 
-            for x_t, log_p in enumerate(state.log_pred):
+            for x_t, log_p in enumerate(state.log_p):
                 edits = [Insert(symbol=x_t, position=hyp.source_pos)]
                 for skip_left, skip_right in [(0,0), (1,0), (0,1)]:
                     if hyp.source_pos+1+skip_left+skip_right > len(text):
@@ -126,14 +128,19 @@ def correct(model, text, beam_size=10, drop_unknown=True):
                         pos = hyp.source_pos
 
                     distance = edit.distance
+                    # TODO: more realistic prior
                     #if hyp.n_copied > 0: distance *= 0.5
 
+                    # TODO: problem with adding entropy to log_p is that
+                    #       it encourages picking symbols with ambiguous
+                    #       continuation
                     new_hyp = Hypothesis(
                             state, x_t,
-                            log_p=hyp.log_p+log_p,
+                            log_p=hyp.log_p+log_p+entropy_weight*state.entropy,
                             distance=hyp.distance+distance,
                             n_copied=0 if distance else hyp.n_copied+1,
                             source_pos=pos,
+                            edit_cost=edit_cost,
                             edits=hyp.edits+(edit,))
                     ident = (id(state), x_t, pos)
                     _, best_score = best_at_pos.get(
@@ -144,10 +151,10 @@ def correct(model, text, beam_size=10, drop_unknown=True):
         beam = sorted([hyp for hyp,_ in best_at_pos.values()] + finished,
                       key=lambda hyp: -hyp.score)[:beam_size]
 
-        for hyp in beam:
+        for hyp in beam[:1]:
             print(''.join(model.alphabet[c] for c in hyp.state.history) +
                   '|' + model.alphabet[hyp.x_t], hyp.log_p, hyp.distance)
-        print('-'*72)
+        #print('-'*72)
 
         # TODO: better criterion for termination?
         if beam[0].source_pos == len(text):
@@ -164,6 +171,12 @@ def main():
     parser.add_argument(
             '--normalize', action='store_true',
             help='attempt to normalize a text with the language model')
+    parser.add_argument(
+            '--edit-cost', type=float, metavar='X', default=6.0,
+            help='cost of edit operation in bits')
+    parser.add_argument(
+            '--entropy-weight', type=float, metavar='X', default=0.0,
+            help='weight of predictive entropy in score')
     parser.add_argument(
             '--drop-unknown', action='store_true',
             help='drop unknown characters (default: use UNK tokens)')
@@ -226,14 +239,15 @@ def main():
             hypotheses = correct(
                     model, text,
                     beam_size=args.beam_size,
-                    drop_unknown=args.drop_unknown)
+                    drop_unknown=args.drop_unknown,
+                    edit_cost=args.edit_cost,
+                    entropy_weight=args.entropy_weight)
             for hyp in hypotheses:
-                print(hyp.source_pos,
-                        ''.join(model.alphabet[c]
-                                for c in hyp.state.history[1:] + (hyp.x_t,)))
-                #print(hyp.source_pos)
-                pprint([(model.alphabet[e.symbol], str(e)) for e in hyp.edits
-                        if not e.identity])
+                print(''.join(
+                    model.alphabet[c]
+                    for c in hyp.state.history[1:] + (hyp.x_t,)))
+                #pprint([(model.alphabet[e.symbol], str(e)) for e in hyp.edits
+                #        if not e.identity])
         else:
             # Need a symbol to start predicting from
             text = ' ' + text
