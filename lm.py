@@ -6,6 +6,7 @@ class LanguageModel(Chain):
     def __init__(self, alphabet, embedding_size, state_size, n_layers,
                  dropout=0.0):
         self.alphabet = alphabet
+        self.alphabet_index = {c:i for i,c in enumerate(alphabet)}
         super().__init__(
                 embeddings=L.EmbedID(
                     len(alphabet), embedding_size, ignore_label=-1),
@@ -15,6 +16,6 @@ class LanguageModel(Chain):
                     state_size, len(alphabet)))
 
     def __call__(self, xs, hs=None, cs=None):
-        hs, cs, ys = self.lstm(hs, cs, [self.embeddings(x) for x in xs])
+        hs, cs, ys = self.lstm(hs, cs, list(self.embeddings(xs)))
         return [self.output(y) for y in ys], hs, cs
 
