@@ -99,6 +99,7 @@ def main():
                 F.flatten(xs[:,1:]))
         return loss, pred_ys, hs, cs
  
+    best_heldout_loss = float('inf')
     n_batches = 0
     train_hs, train_cs = None, None
     while True:
@@ -116,7 +117,6 @@ def main():
               flush=True)
 
         n_batches += 1
-        best_heldout_loss = float('inf')
         if n_batches % 250 == 0:
             heldout_loss = 0.0
             t0 = time.time()

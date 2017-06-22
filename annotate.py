@@ -56,6 +56,10 @@ class Insert(EditOp):
     def __str__(self):
         return '@%d+%d' % (self.position, self.symbol)
 
+    def aligned(self, text, padding=0):
+        return [padding], [self.symbol]
+
+
 class SkipReplace(EditOp):
     def __init__(self, original, symbol, left, right, position):
         super().__init__()
@@ -71,6 +75,12 @@ class SkipReplace(EditOp):
         return '@%d %d,(%d->%d),%d' % (
                 self.position, self.left, self.original, self.symbol,
                 self.right)
+
+    def aligned(self, text, padding=0):
+        original = []
+        normalized = []
+        for _ in range(self.left):
+            original.append
 
 def correct(model, text, beam_size=10, drop_unknown=True, entropy_weight=0.0,
             edit_cost=6.0):
@@ -151,12 +161,11 @@ def correct(model, text, beam_size=10, drop_unknown=True, entropy_weight=0.0,
         beam = sorted([hyp for hyp,_ in best_at_pos.values()] + finished,
                       key=lambda hyp: -hyp.score)[:beam_size]
 
-        for hyp in beam[:1]:
-            print(''.join(model.alphabet[c] for c in hyp.state.history) +
-                  '|' + model.alphabet[hyp.x_t], hyp.log_p, hyp.distance)
+        #for hyp in beam[:1]:
+        #    print(''.join(model.alphabet[c] for c in hyp.state.history) +
+        #          '|' + model.alphabet[hyp.x_t], hyp.log_p, hyp.distance)
         #print('-'*72)
 
-        # TODO: better criterion for termination?
         if beam[0].source_pos == len(text):
             break
 
@@ -180,6 +189,12 @@ def main():
     parser.add_argument(
             '--drop-unknown', action='store_true',
             help='drop unknown characters (default: use UNK tokens)')
+    parser.add_argument(
+            '--n-best', action='store_true',
+            help='when normalizing, output n-best lists')
+    parser.add_argument(
+            '--output-aligned', action='store_true',
+            help='when normalizing, output aligned original/normalized text')
     parser.add_argument(
             '--gpu', type=int, metavar='N', default=-1,
             help='gpu to use (default: use CPU)')
@@ -227,7 +242,6 @@ def main():
     chainer.config.train = False
     chainer.config.enable_backprop = False
 
-    from pprint import pprint
     for filename in args.filenames:
         with open(filename, 'r', encoding='utf-8') as f:
             text = f.read()
@@ -242,12 +256,16 @@ def main():
                     drop_unknown=args.drop_unknown,
                     edit_cost=args.edit_cost,
                     entropy_weight=args.entropy_weight)
-            for hyp in hypotheses:
-                print(''.join(
-                    model.alphabet[c]
-                    for c in hyp.state.history[1:] + (hyp.x_t,)))
-                #pprint([(model.alphabet[e.symbol], str(e)) for e in hyp.edits
-                #        if not e.identity])
+            if not args.n_best: hypotheses = hypotheses[:1]
+            for i, hyp in enumerate(hypotheses):
+                normalized = ''.join(
+                        model.alphabet[c]
+                        for c in hyp.state.history[1:] + (hyp.x_t,))
+                if args.n_best:
+                    print('%d\t%g\t%s' % (i, hyp.score, normalized),
+                          flush=True)
+                else:
+                    print(normalized, flush=True)
         else:
             # Need a symbol to start predicting from
             text = ' ' + text
