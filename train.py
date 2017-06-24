@@ -32,6 +32,9 @@ def main():
             '--layers', type=int, metavar='N', default=2,
             help='number of LSTM layers')
     parser.add_argument(
+            '--random-seed', type=int, metavar='N',
+            help='random seed for data shuffling (and heldout set sampling)')
+    parser.add_argument(
             '--batch-size', type=int, metavar='N', default=64,
             help='batch size')
     parser.add_argument(
@@ -69,6 +72,7 @@ def main():
 
     xp = model.xp
 
+    if args.random_seed: random.seed(args.random_seed)
     zipcorpus = ZipCorpus(args.corpus)
 
     streams = [zipcorpus.character_stream(args.chunk_size)
@@ -88,6 +92,7 @@ def main():
     optimizer = optimizers.Adam()
     optimizer.use_cleargrads()
     optimizer.setup(model)
+    optimizer.add_hook(chainer.optimizer.GradientClipping(5.0))
 
     def compute_loss(xs, hs, cs):
         pred_ys, hs, cs = model(xs, hs, cs)

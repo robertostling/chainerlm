@@ -4,8 +4,9 @@ import random
 class ZipCorpus:
     def __init__(self, path):
         self.zipfile = zipfile.ZipFile(path)
-        self.files = [info.filename for info in self.zipfile.infolist()
-                      if not info.filename.endswith('/')]
+        self.files = sorted(
+                [info.filename for info in self.zipfile.infolist()
+                 if not info.filename.endswith('/')])
 
     def character_stream(self, size, normalize_blank=True, separator=' '):
         data = ''
