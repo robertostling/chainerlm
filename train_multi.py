@@ -11,7 +11,6 @@ from chainer import optimizers, serializers
 import chainer.functions as F
 
 from lm import MultiLanguageModel
-#from zipcorpus import ZipCorpus
 
 def main():
     parser = argparse.ArgumentParser(
@@ -79,17 +78,6 @@ def main():
     xp = model.xp
 
     if args.random_seed: random.seed(args.random_seed)
-    #zipcorpus = ZipCorpus(args.corpus)
-    #streams = [zipcorpus.character_stream(args.chunk_size)
-    #           for _ in range(args.batch_size)]
-
-    #def read_batch():
-    #    rows = [next(stream) for stream in streams]
-    #    unk = vocab_index['<UNK>']
-    #    return xp.array([
-    #        [vocab_index.get(c, unk) for c in row]
-    #        for row in rows],
-    #        dtype=xp.int32)
 
     def text_stream(language):
         i = 0
@@ -180,6 +168,7 @@ def main():
                 with open(args.model + '.metadata', 'wb') as f:
                     pickle.dump(args, f, -1)
                     pickle.dump(vocab, f, -1)
+                    pickle.dump(languages, f, -1)
 
 
 if __name__ == '__main__':
