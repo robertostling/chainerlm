@@ -12,6 +12,7 @@ import chainer.functions as F
 
 from lm import LanguageModel
 from zipcorpus import ZipCorpus
+from sampacorpus import SAMPACorpus, SAMPAVocabulary
 
 def main():
     parser = argparse.ArgumentParser(
@@ -49,18 +50,28 @@ def main():
     parser.add_argument(
             '--model', type=str, metavar='PREFIX',
             help='prefix of model files')
+    parser.add_argument(
+            '--sampa', type=str, metavar='FILE',
+            help='zipped SAMPA corpus (brain-information project)')
+    parser.add_argument(
+            '--disallow-unk', action='store_true',
+            help='return an error if unknown tokens are found')
     args = parser.parse_args()
 
     if args.vocabulary:
         with open(args.vocabulary, 'rb') as f:
             vocab = pickle.load(f)
     else:
-        vocab = list(
-                r''' !"&\'()*+,-./0123456789:;<>?ABCDEFGHIJKLMNOPQRS'''
-                r'''TUVWXYZ_abcdefghijklmnopqrstuvwxyzÄÅÖäåö–“”…''')
+        if args.sampa:
+            vocab = SAMPAVocabulary
+        else:
+            vocab = list(
+                    r''' !"&\'()*+,-./0123456789:;<>?ABCDEFGHIJKLMNOPQRS'''
+                    r'''TUVWXYZ_abcdefghijklmnopqrstuvwxyzÄÅÖäåö–“”…''')
 
 
-    vocab = ['<UNK>'] + vocab
+    if not args.disallow_unk:
+        vocab = ['<UNK>'] + vocab
     vocab_index = {c:i for i,c in enumerate(vocab)}
 
     model = LanguageModel(
@@ -73,18 +84,28 @@ def main():
     xp = model.xp
 
     if args.random_seed: random.seed(args.random_seed)
-    zipcorpus = ZipCorpus(args.corpus)
-
-    streams = [zipcorpus.character_stream(args.chunk_size)
-               for _ in range(args.batch_size)]
+    if args.corpus:
+        zipcorpus = ZipCorpus(args.corpus)
+        streams = [zipcorpus.character_stream(args.chunk_size)
+                   for _ in range(args.batch_size)]
+    elif args.sampa:
+        sampacorpus = SAMPACorpus(args.sampa)
+        streams = [sampacorpus.stream(args.chunk_size)
+                   for _ in range(args.batch_size)]
 
     def read_batch():
         rows = [next(stream) for stream in streams]
-        unk = vocab_index['<UNK>']
-        return xp.array([
-            [vocab_index.get(c, unk) for c in row]
-            for row in rows],
-            dtype=xp.int32)
+        if args.disallow_unk:
+            return xp.array([
+                [vocab_index[c] for c in row]
+                for row in rows],
+                dtype=xp.int32)
+        else:
+            unk = vocab_index['<UNK>']
+            return xp.array([
+                [vocab_index.get(c, unk) for c in row]
+                for row in rows],
+                dtype=xp.int32)
 
     n_heldout_batches = 8
     heldout_batches = [read_batch() for _ in range(n_heldout_batches)]
