@@ -46,10 +46,11 @@ class SAMPACorpus:
                 sentences.append(self.read_sentence())
                 length += len(sentences[-1])
             for sentence in sentences:
-                for word in sentence:
+                for i, word in enumerate(sentence):
                     for phoneme in word:
                         yield phoneme
-                    if word_separator: yield word_separator
+                    if (not sentence_separator) or i < len(sentence)-1:
+                        if word_separator: yield word_separator
                 if sentence_separator: yield sentence_separator
 
     def stream(self, size, **kwargs):
