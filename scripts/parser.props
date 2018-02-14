@@ -1,0 +1,6 @@
+annotators = tokenize, ssplit, pos, lemma, parse
+outputExtension = .xml
+outputFormat = xml
+tokenize.whitespace = true
+ssplit.eolonly = true
+parse.model = edu/stanford/nlp/models/srparser/englishSR.beam.ser.gz
