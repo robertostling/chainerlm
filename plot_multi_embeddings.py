@@ -5,6 +5,8 @@ import numpy as np
 from scipy.cluster.hierarchy import average, dendrogram
 from scipy.spatial.distance import pdist
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 def main():
     model = sys.argv[1]
@@ -17,10 +19,18 @@ def main():
     e = params['language_embeddings/W']
     print(e.shape)
 
-    y = pdist(e, 'cosine')
-    z = average(y)
-    dendrogram(z, labels=languages)
-    plt.show()
+    if False:
+        y = pdist(e, 'cosine')
+        z = average(y)
+        dendrogram(z, labels=languages)
+        plt.show()
+    else:
+        #m = TSNE().fit_transform(e)
+        m = PCA(n_components=2).fit_transform(e)
+        plt.scatter(m[:,0], m[:,1])
+        for xy, language in zip(m, languages):
+            plt.annotate(language, xy)
+        plt.show()
 
 if __name__ == '__main__': main()
 
