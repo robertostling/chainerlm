@@ -2,7 +2,7 @@ import sys
 import pickle
 
 import numpy as np
-from scipy.cluster.hierarchy import average, dendrogram
+from scipy.cluster.hierarchy import average, ward, dendrogram
 from scipy.spatial.distance import pdist
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
@@ -19,9 +19,20 @@ def main():
     e = params['language_embeddings/W']
     print(e.shape)
 
-    if False:
+    ignore_languages = set()
+    # Uncomment the line below to cherry-pick languages in the same way as
+    # Rabinovich et al.
+    #ignore_languages = set('HU ET FI EL MT'.split())
+    keep = [i for i, language in enumerate(languages)
+              if language not in ignore_languages]
+
+    languages = [languages[i] for i in keep]
+    e = e[keep,:]
+
+    if True:
         y = pdist(e, 'cosine')
-        z = average(y)
+        #z = average(y)
+        z = ward(y)
         dendrogram(z, labels=languages)
         plt.show()
     else:
