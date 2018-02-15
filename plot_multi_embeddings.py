@@ -34,14 +34,17 @@ def main():
         #z = average(y)
         z = ward(y)
         dendrogram(z, labels=languages)
-        plt.show()
     else:
         #m = TSNE().fit_transform(e)
         m = PCA(n_components=2).fit_transform(e)
         plt.scatter(m[:,0], m[:,1])
         for xy, language in zip(m, languages):
             plt.annotate(language, xy)
-        plt.show()
+
+    if len(sys.argv) > 2:
+        assert sys.argv[2].endswith('.pdf')
+        plt.savefig(sys.argv[2])
+    plt.show()
 
 if __name__ == '__main__': main()
 
