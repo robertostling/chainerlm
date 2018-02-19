@@ -16,6 +16,9 @@ def main():
     parser = argparse.ArgumentParser(
             description='Multilingual LSTM language model training')
     parser.add_argument(
+            '--tokenized', action='store_true',
+            help='assume tokenized text (default: character level)')
+    parser.add_argument(
             '--gpu', type=int, metavar='N', default=-1,
             help='gpu to use (default: use CPU)')
     parser.add_argument(
@@ -59,13 +62,27 @@ def main():
     vocab = ['<UNK>'] + vocab
     vocab_index = {c:i for i,c in enumerate(vocab)}
 
+    print('INFO', 'VOC', len(vocab), flush=True)
+
     with open(args.corpus, 'r', encoding='utf-8') as f:
         data = [[field.strip() for field in line.split('\t')]
                 for line in f]
-        data = [fields for fields in data if len(fields) == 2]
+        if args.tokenized:
+            data = [(fields[0], fields[1].split())
+                    for fields in data if len(fields) == 2]
+        else:
+            data = [fields for fields in data if len(fields) == 2]
 
     languages = sorted({fields[0] for fields in data})
     random.shuffle(data)
+
+    n_in_vocab = sum(sum(symbol in vocab_index for symbol in tokens)
+                     for _,tokens in data)
+    n_tokens = sum(len(tokens) for _,tokens in data)
+
+    print('INFO', 'DATA', len(data), flush=True)
+    print('INFO', n_in_vocab, 'OF', n_tokens, 'IN-VOCAB', flush=True)
+    print('INFO', 'LANG', ' '.join(languages), flush=True)
 
     model = MultiLanguageModel(
             vocab, len(languages), args.language_embedding_size,
@@ -103,6 +120,7 @@ def main():
         langs = [random.randint(0, len(languages)-1)
                  for _ in range(batch_size)]
         xs = [next(streams[lang]) for lang in langs]
+        print(xs)
         return (xp.array(langs, dtype=xp.int32), 
                 xp.array([[vocab_index.get(c, unk) for c in x] for x in xs],
                          dtype=xp.int32))

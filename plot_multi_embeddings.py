@@ -3,7 +3,7 @@ import pickle
 
 import numpy as np
 from scipy.cluster.hierarchy import average, ward, dendrogram
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
@@ -44,6 +44,10 @@ def main():
     if len(sys.argv) > 2:
         assert sys.argv[2].endswith('.pdf')
         plt.savefig(sys.argv[2])
+        y = pdist(e, 'cosine')
+        with open(sys.argv[2][:-3] + 'pickle', 'wb') as f:
+            pickle.dump(languages, f)
+            pickle.dump(squareform(y), f)
     plt.show()
 
 if __name__ == '__main__': main()
