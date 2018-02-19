@@ -60,6 +60,8 @@ def main():
         vocab = pickle.load(f)
 
     vocab = ['<UNK>'] + vocab
+    if ' ' not in vocab:
+        vocab = [' '] + vocab
     vocab_index = {c:i for i,c in enumerate(vocab)}
 
     print('INFO', 'VOC', len(vocab), flush=True)
@@ -98,12 +100,13 @@ def main():
 
     def text_stream(language):
         i = 0
-        buf = ''
+        buf = []
         while True:
             if data[i][0] == language:
-                sentence = data[i][1]
+                sentence = list(data[i][1])
                 if buf:
-                    buf = buf + ' ' + sentence
+                    buf.append(' ')
+                    buf.extend(sentence)
                 else:
                     buf = sentence
                 while len(buf) >= args.chunk_size:
@@ -120,7 +123,6 @@ def main():
         langs = [random.randint(0, len(languages)-1)
                  for _ in range(batch_size)]
         xs = [next(streams[lang]) for lang in langs]
-        print(xs)
         return (xp.array(langs, dtype=xp.int32), 
                 xp.array([[vocab_index.get(c, unk) for c in x] for x in xs],
                          dtype=xp.int32))
